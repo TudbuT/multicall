@@ -17,6 +17,7 @@ impl Test {
 
 fn main() {
     let mut test = Test { a: 0, b: 0 };
+    let mut value = 5;
     multicall! {
         &mut test:
         a = 5;
@@ -35,6 +36,8 @@ fn main() {
         &test:
         print_a();
         print_b();
+        set value += a;
+        exec println!("{:?}", #);
     }
-    println!("{test:?}");
+    println!("{}", value);
 }
