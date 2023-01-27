@@ -174,13 +174,9 @@ fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -
                         accum.0 = false;
                     }
                 }
-                if accum.3 {
-                    accum
-                        .1
-                        .push(recursive_replace(x, "#", "__multicall_item__"));
-                } else {
-                    accum.1.push(x);
-                }
+                accum
+                    .1
+                    .push(recursive_replace(x, "#", "__multicall_item__"));
             }
             accum
         })
