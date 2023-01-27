@@ -213,13 +213,3 @@ fn recursive_replace(token: TokenTree, from: &str, to: &str) -> TokenTree {
         x => x,
     }
 }
-
-trait To {
-    fn to(self, var: &mut Self);
-}
-
-impl<T: Sized> To for T {
-    fn to(self, var: &mut Self) {
-        *var = self;
-    }
-}
