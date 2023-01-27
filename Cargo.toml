@@ -1,0 +1,13 @@
+[package]
+name = "multicall"
+version = "0.1.0"
+edition = "2021"
+description = "Macro to simplify multiple operations or calls on a single object"
+license = "MIT"
+categories = [ "no-std", "development-tools", "rust-patterns" ]
+keywords = [ "macro", "utility", "macros", "simplification" ]
+
+[lib]
+proc-macro = true
+
+[dependencies]
