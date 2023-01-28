@@ -75,3 +75,11 @@ fn main() {
 }
 ```
 More in examples/.
+
+## Roadmap
+
+- [x] Basic multicall syntax
+- [x] `set` external variables
+- [x] `exec` normal code
+- [ ] If statements
+- ... maybe more

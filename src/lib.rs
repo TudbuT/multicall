@@ -110,8 +110,10 @@ fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -
         Vec::new()
     };
     while let Some(item) = iter.next() {
-        if item.to_string() == ":" {
-            break;
+        if let TokenTree::Punct(ref x) = item {
+            if x.as_char() == ':' && x.spacing() == Spacing::Alone {
+                break;
+            }
         }
         if item.to_string() == "mut" && dat.len() == 1 {
             is_mut = true;
