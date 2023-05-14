@@ -7,6 +7,11 @@
 
 extern crate alloc;
 extern crate proc_macro;
+#[cfg(MULTICALL_DEBUG)]
+extern crate std;
+
+#[cfg(MULTICALL_DEBUG)]
+use std::println;
 
 use alloc::string::ToString;
 use alloc::vec;
@@ -95,7 +100,11 @@ pub fn multicall(input: TokenStream) -> TokenStream {
 
 fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -> TokenStream {
     let mut iter = input.into_iter();
+    #[cfg(MULTICALL_DEBUG)]
+    println!("creating new multicall block...");
     let mut dat = if is_recursed {
+        #[cfg(MULTICALL_DEBUG)]
+        println!("inserting multicall item because this is a recursed block.");
         let mut v = vec![
             TokenTree::Punct(Punct::new('&', Spacing::Alone)),
             TokenTree::Ident(Ident::new("mut", Span::call_site())),
@@ -109,6 +118,8 @@ fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -
     } else {
         Vec::new()
     };
+    #[cfg(MULTICALL_DEBUG)]
+    println!("initialized. reading item...");
     while let Some(item) = iter.next() {
         if let TokenTree::Punct(ref x) = item {
             if x.as_char() == ':' && x.spacing() == Spacing::Alone {
@@ -120,6 +131,8 @@ fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -
         }
         dat.push(item)
     }
+    #[cfg(MULTICALL_DEBUG)]
+    println!("item read. writing initial let statement.");
     let mut ts = TokenStream::new();
     ts.extend(
         vec![
@@ -131,59 +144,94 @@ fn multicall_internal(input: TokenStream, is_recursed: bool, mut is_mut: bool) -
     );
     ts.extend(dat.clone().into_iter());
     ts.extend(vec![TokenTree::Punct(Punct::new(';', Spacing::Alone))].into_iter());
+    #[cfg(MULTICALL_DEBUG)]
+    println!("done. starting state machine and processing statements.");
+    #[derive(Default, PartialEq, Eq)]
+    enum State {
+        #[default]
+        InsertNew,
+        Set,
+        Inserted,
+    }
+    #[derive(Default)]
+    struct AccumState {
+        words: Vec<TokenTree>,
+        state: State,
+    }
     ts.extend(
-        iter.fold((true, Vec::new(), false, false), |mut accum, x| {
+        iter.fold(AccumState::default(), |mut accum, x| {
             let o = x.to_string();
             // Sub-calls
             if let Some(x) = match x {
-                TokenTree::Group(ref x) if accum.0 => Some(x),
+                TokenTree::Group(ref x) if accum.state == State::InsertNew => Some(x),
                 _ => None,
             } {
+                #[cfg(MULTICALL_DEBUG)]
+                println!("found group, making sub-call:");
                 accum
-                    .1
+                    .words
                     .extend(multicall_internal(x.stream(), true, is_mut).into_iter());
-                accum.0 = false;
+                accum.state = State::Inserted;
+                #[cfg(MULTICALL_DEBUG)]
+                println!("sub-call inserted.");
             // End of call
             } else if o == ";" {
-                accum.0 = true;
-                accum.2 = false;
-                accum.3 = false;
+                #[cfg(MULTICALL_DEBUG)]
+                println!("found semicolon. resetting.");
+                accum.state = State::InsertNew;
                 accum
-                    .1
+                    .words
                     .push(TokenTree::Punct(Punct::new(';', Spacing::Alone)));
             // Call content
             } else {
-                if accum.0 {
+                #[cfg(MULTICALL_DEBUG)]
+                println!("found statement. parsing...");
+                if accum.state == State::InsertNew {
+                    #[cfg(MULTICALL_DEBUG)]
+                    println!("detecting statement type...");
                     if o == "set" {
-                        accum.2 = true;
-                        return accum; // dont include
-                    } else if accum.2 {
-                        if o == "=" {
-                            accum.2 = false;
-                        }
+                        #[cfg(MULTICALL_DEBUG)]
+                        println!("statement is 'set'.");
+                        accum.state = State::Set;
+                        return accum; // dont insert
                     } else if o == "exec" {
-                        accum.3 = true;
-                        accum.0 = false;
-                        return accum; // dont include
-                    } else if !accum.3 {
-                        accum.1.push(TokenTree::Ident(Ident::new(
-                            "__multicall_item__",
-                            Span::call_site(),
-                        )));
-                        accum
-                            .1
-                            .push(TokenTree::Punct(Punct::new('.', Spacing::Alone)));
-                        accum.0 = false;
+                        #[cfg(MULTICALL_DEBUG)]
+                        println!("statement is 'exec'. marking for full replay.");
+                        accum.state = State::Inserted;
+                        return accum; // dont insert
+                    }
+                    #[cfg(MULTICALL_DEBUG)]
+                    println!("inserting item.");
+                    accum.words.push(TokenTree::Ident(Ident::new(
+                        "__multicall_item__",
+                        Span::call_site(),
+                    )));
+                    accum
+                        .words
+                        .push(TokenTree::Punct(Punct::new('.', Spacing::Alone)));
+                    accum.state = State::Inserted;
+                    #[cfg(MULTICALL_DEBUG)]
+                    println!("done. replaying rest.");
+                }
+                if accum.state == State::Set {
+                    if o == "=" {
+                        #[cfg(MULTICALL_DEBUG)]
+                        println!("replaying '='.");
+                        accum.state = State::InsertNew;
                     }
                 }
+                #[cfg(MULTICALL_DEBUG)]
+                println!("replaying '{x}'");
                 accum
-                    .1
+                    .words
                     .push(recursive_replace(x, "#", "__multicall_item__"));
             }
             accum
         })
-        .1,
+        .words,
     );
+    #[cfg(MULTICALL_DEBUG)]
+    println!("multicall block done.");
     TokenStream::from(TokenTree::Group(Group::new(Delimiter::Brace, ts)))
 }
 
