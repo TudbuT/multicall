@@ -1,6 +1,6 @@
 [package]
 name = "multicall"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "Macro to simplify multiple operations or calls on a single object"
 license = "MIT"
